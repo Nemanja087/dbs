@@ -1,0 +1,15 @@
+dbs.form:
+  path: '/dbs/form'
+  defaults:
+    _title: 'dbs form'
+    _form: '\Drupal\dbs\Form\DBSForm'
+  requirements:
+    _permission: 'access content'
+
+dbsq.form:
+  path: 'dbs/myquery'
+  defaults:
+    _form: '\Drupal\dbs\Form\DBSQuery'
+    _title: 'Query Form'
+  requirements:
+    _permission: 'access content'

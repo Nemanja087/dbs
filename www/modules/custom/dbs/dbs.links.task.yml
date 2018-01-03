@@ -1,0 +1,11 @@
+dbs.tab_1:
+  route_name: dbs.form
+  title: Form Tab
+  base_route: dbs.form
+  weight: 10
+
+dbs.tab_2:
+  route_name: dbsq.form
+  title: Query Tab
+  base_route: dbs.form
+  weight: 20

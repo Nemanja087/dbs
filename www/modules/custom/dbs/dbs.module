@@ -1,0 +1,7 @@
+<?php
+
+function dbs_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+    if($form_id == 'db_search_form') {
+//        kint($form);
+    }
+}

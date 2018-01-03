@@ -1,0 +1,178 @@
+version: "2"
+
+services:
+  mariadb:
+    image: wodby/drupal-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: drupal
+      MYSQL_DATABASE: drupal
+      MYSQL_USER: drupal
+      MYSQL_PASSWORD: drupal
+    volumes:
+#      - ./databases/init:/docker-entrypoint-initdb.d  # Place init .sql file(s) here.
+      - ./runtime/mariadb:/var/lib/mysql
+      - ./databases:/var/lib/mysql/databases
+
+  php:
+    image: wodby/drupal-php:7.0
+#    image: wodby/drupal-php:5.6
+    restart: unless-stopped
+    environment:
+      PHP_SENDMAIL_PATH: /usr/sbin/sendmail -t -i -S mailhog:1025
+      DB_HOST: mariadb
+      DB_USER: drupal
+      DB_PASSWORD: drupal
+      DB_NAME: drupal
+      DB_DRIVER: mysql
+      PHP_XDEBUG_ENABLED: 1 # Set 1 to enable.
+      PHP_XDEBUG_AUTOSTART: 1
+      PHP_XDEBUG_REMOTE_CONNECT_BACK: 0
+      PHP_XDEBUG_REMOTE_HOST: "10.254.254.254"
+
+      # Deprecated
+      PHP_SITE_NAME: dev
+      PHP_HOST_NAME: d8.dev.loc
+      PHP_DOCROOT: www # Relative path inside the /var/www/html/ directory.
+    volumes:
+      # - codebase:/var/www/html
+      - ./:/var/www/html
+      - ./runtime/drush:/home/www-data/.drush
+
+  nginx:
+    image: wodby/drupal-nginx:1.10
+    restart: unless-stopped
+    depends_on:
+      - php
+    environment:
+      NGINX_STATIC_CONTENT_OPEN_FILE_CACHE: "off"
+      NGINX_ERROR_LOG_LEVEL: debug
+      NGINX_BACKEND_HOST: php
+      NGINX_SERVER_ROOT: /var/www/html/www
+      # Deprecated
+      NGINX_SERVER_NAME: localhost
+      NGINX_UPSTREAM_NAME: php
+      NGINX_DOCROOT: www # Relative path inside the /var/www/html/ directory.
+      DRUPAL_VERSION: 8 # Allowed: 7, 8.
+      VIRTUAL_HOST: d8.dev.loc
+      # LETSENCRYPT_HOST: d8.dev.loc,d8.pma.loc,d8.hog.loc
+      # LETSENCRYPT_EMAIL: info@d8.dev.loc
+    volumes:
+      # - codebase:/var/www/html
+      - ./:/var/www/html
+    networks:
+      - default
+      - traefik_proxy
+      # Deprecated
+      - proxy_net
+    labels:
+      - 'traefik.backend=drupal_nginx'
+      - 'traefik.port=80'
+      - 'traefik.frontend.rule=Host:d8.dev.loc'
+      - "traefik.docker.network=traefik_proxy"
+
+  pma:
+    image: phpmyadmin/phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mariadb
+      PMA_USER: drupal
+      PMA_PASSWORD: drupal
+      PHP_UPLOAD_MAX_FILESIZE: 1G
+      PHP_MAX_INPUT_VARS: 1G
+      # Deprecated
+      VIRTUAL_HOST: d8.pma.loc
+    volumes:
+      - ./runtime/metro:/www/themes/metro
+      # Add custom pma configuration e.g. to prevent timeout https://docs.phpmyadmin.net/en/latest/config.html#config
+#      -v ./runtime/pma-config.user.inc.php:/etc/phpmyadmin/config.user.inc.php
+    networks:
+      - default
+      - traefik_proxy
+      # Deprecated
+      - proxy_net
+    labels:
+      - 'traefik.backend=drupal_pma'
+      - 'traefik.port=80'
+      - 'traefik.frontend.rule=Host:d8.pma.loc'
+      - "traefik.docker.network=traefik_proxy"
+
+  mailhog:
+    image: mailhog/mailhog
+    restart: unless-stopped
+    environment:
+      # Deprecated
+      VIRTUAL_HOST: d8.hog.loc
+      VIRTUAL_PORT: 8025
+    networks:
+      - default
+      - traefik_proxy
+      # Deprecated
+      - proxy_net
+    labels:
+      - 'traefik.backend=drupal_mailhog'
+      - 'traefik.port=8025'
+      - 'traefik.frontend.rule=Host:d8.hog.loc'
+      - "traefik.docker.network=traefik_proxy"
+
+volumes:
+  codebase:
+    driver_opts:
+      type: none
+      # device: ./
+      # - seems it needs absolute path, check!
+      device: /_abs_path_to_your_/Sites/d8
+      o: bind
+
+networks:
+  traefik_proxy:
+    external: true
+  proxy_net:
+    external: true
+
+#  elasticsearch:
+#    image: elasticsearch:alpine
+#    restart: unless-stopped
+#    # Clustering support
+#    environment:
+#      - transport.host:0.0.0.0
+#      - discovery.zen.minimum_master_nodes:1
+#    volumes:
+#      - ./runtime/elasticsearch/data:/usr/share/elasticsearch/data
+#      - ./runtime/elasticsearch/config:/usr/share/elasticsearch/config
+#    networks:
+#      - proxy_net
+#      - default
+#
+
+#  redis:
+#    image: redis:3.2-alpine
+
+#  memcached:
+#    image: memcached:1.4-alpine
+
+#  memcached-admin:
+#    image: phynias/phpmemcachedadmin
+#    ports:
+#      - "8047:80"
+
+#  solr:
+#    image: solr:5.5-alpine
+#    volumes:
+#      - ./runtime/solr:/opt/solr/server/solr/mycores
+#    ports:
+#      - "8043:8983"
+
+#  varnish:
+#    image: wodby/drupal-varnish
+#    depends_on:
+#      - nginx
+#    environment:
+#      VARNISH_SECRET: secret
+#      VARNISH_BACKEND_HOST: nginx
+#      VARNISH_BACKEND_PORT: 80
+#      VARNISH_MEMORY_SIZE: 256M
+#      VARNISH_STORAGE_SIZE: 1024M
+#    ports:
+#      - "8044:6081" # HTTP Proxy
+#      - "8045:6082" # Control terminal
